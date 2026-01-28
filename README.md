@@ -32,3 +32,8 @@ And the video below:
 
 ## Try 4
 <video src="https://github.com/a-t-0/test-pausable-gif/demo.mp4" controls width="600"></video>
+
+## Try 5
+<video src="demo.mp4" controls muted autoplay loop style="max-width: 100%;">
+  Your browser does not support the video tag.
+</video>
