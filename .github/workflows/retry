@@ -1,0 +1,39 @@
+- name: Upload video via temporary issue comment and extract URL
+  id: get-video-url
+  run: |
+    # Create temp issue
+    ISSUE=$(gh issue create --title "TEMP: Upload demo video" --body "Uploading video..." --repo ${{ github.repository }})
+    ISSUE_NUMBER=$(echo $ISSUE | grep -o '[0-9]\+$')
+
+    # Upload the file as attachment to a new comment on the issue
+    COMMENT_RESPONSE=$(gh api \
+      --method POST \
+      -H "Accept: application/vnd.github+json" \
+      /repos/${{ github.repository }}/issues/$ISSUE_NUMBER/comments \
+      -f body="Uploading demo.mp4..." \
+      --input - <<EOF
+    {
+      "body": "temp"
+    }
+    EOF
+    )
+
+    # Actually attach the file by using the comment edit endpoint or manual upload simulation isn't direct;
+    # Better: use curl with token to upload to issues upload endpoint (more reliable)
+    
+    # Alternative proven method: curl upload
+    UPLOAD_URL="https://uploads.github.com/repos/${{ github.repository }}/issues/$ISSUE_NUMBER/assets?name=demo.mp4"
+    VIDEO_URL=$(curl \
+      -H "Authorization: token ${{ github.token }}" \
+      -H "Accept: application/vnd.github.v3+json" \
+      --data-binary @demo.mp4 \
+      $UPLOAD_URL | jq -r '.browser_download_url // .url' | grep -E '\.mp4$')
+
+    echo "Got URL: $VIDEO_URL"
+    echo "VIDEO_URL=$VIDEO_URL" >> $GITHUB_OUTPUT
+
+    # Cleanup
+    gh issue close $ISSUE_NUMBER --comment "Temp upload done"
+    gh issue delete $ISSUE_NUMBER --yes
+  env:
+    GH_TOKEN: ${{ github.token }}
