@@ -28,3 +28,7 @@ And the video below:
 
 ## Try 3
 <video src="https://github.com/a-t-0/test-pausable-gif/assets/.../demo.mp4" controls width="600"></video>
+
+
+## Try 4
+<video src="https://github.com/a-t-0/test-pausable-gif/demo.mp4" controls width="600"></video>
