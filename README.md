@@ -11,16 +11,4 @@ Retrieved 2026-01-28, License - CC BY-SA 4.0
 <img src="https://media.giphy.com/media/vFKqnCdLPNOKc/giphy.gif" width="40" height="40" />
 
 
-<details>
-  <summary><b>Click to preview animation (GIF)</b></summary>
-  <br>
-  <img src="https://path-to-your-animation.gif" alt="Demo Animation">
-</details>
-
-
-# Generates: [![Demo](thumb.png)](demo.gif)
-print(generate_pausable_gif_link(
-    thumbnail_url="https://example.com/static-frame.png", 
-    gif_url="https://example.com/animated.gif", 
-    alt_text="Click to play demo"
-))
+<video src="demo.mp4" controls width="600"></video>
