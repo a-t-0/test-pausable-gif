@@ -24,3 +24,7 @@ This is a test repo for embedding a pausable video in README.
 And the video below:
 
 <video src="demo.mp4" controls width="600"></video>
+
+
+## Try 3
+<video src="https://github.com/a-t-0/test-pausable-gif/assets/.../demo.mp4" controls width="600"></video>
