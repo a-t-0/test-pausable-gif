@@ -3,11 +3,11 @@ name: Update Pausable Demo Video in README
 on:
   push:
     paths:
-      - 'demo.mp4'      # change to 'demo.gif' if you prefer GIF
-      # - 'demo.gif'    # uncomment if you use both / switch later
+      - 'demo.mp4'
+      # - 'demo.gif'   # uncomment if you also/switch to gif
 
 permissions:
-  contents: write     # allows commit + push back to repo
+  contents: write
 
 jobs:
   update-demo:
@@ -16,64 +16,71 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0    # needed for git commit below
+          fetch-depth: 0
 
-      - name: Set up GitHub CLI
-        run: |
-          # gh is already installed on ubuntu-latest, but just in case
-          echo "gh version: $(gh --version)"
-
-      - name: Upload demo file to persistent draft release & get new URL
+      - name: Upload demo.mp4 and retrieve embeddable URL
         id: get_url
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: demo-assets   # ← change to whatever tag name you chose above
+          RELEASE_TAG: demo-assets
+          FILENAME: demo.mp4
         run: |
-          # Find the draft release by tag
-          RELEASE_ID=$(gh release view "$RELEASE_TAG" --json id --jq '.id' 2>/dev/null || echo "")
-
-          if [ -z "$RELEASE_ID" ]; then
-            echo "Draft release with tag $RELEASE_TAG not found!"
-            echo "Please create a draft release manually first (see instructions)."
+          # Check if the draft release exists
+          if ! gh release view "$RELEASE_TAG" --json id >/dev/null 2>&1; then
+            echo "Error: Draft release with tag '$RELEASE_TAG' not found."
+            echo "Please create a draft release manually with tag 'demo-assets' first."
             exit 1
           fi
 
-          # Upload (overwrite if same name already exists)
-          UPLOAD_OUTPUT=$(gh release upload "$RELEASE_TAG" demo.mp4 --clobber)
+          echo "Uploading (or overwriting) $FILENAME to draft release '$RELEASE_TAG'..."
+          gh release upload "$RELEASE_TAG" "$FILENAME" --clobber
 
-          # Extract the asset browser URL (the one that starts with https://github.com/.../assets/...)
-          NEW_URL=$(echo "$UPLOAD_OUTPUT" | grep -o 'https://github.com/[^ ]*\.mp4' || echo "")
+          echo "Fetching asset list to get the current URL..."
+          ASSETS_JSON=$(gh release view "$RELEASE_TAG" --json assets --jq '.assets')
 
-          if [ -z "$NEW_URL" ]; then
-            echo "Failed to extract asset URL from upload output:"
-            echo "$UPLOAD_OUTPUT"
+          # Find the browser_download_url for our file
+          NEW_URL=$(echo "$ASSETS_JSON" | jq -r --arg fn "$FILENAME" \
+            'map(select(.name == $fn)) | .[0].browser_download_url // empty')
+
+          if [ -z "$NEW_URL" ] || [ "$NEW_URL" = "null" ]; then
+            echo "Error: Could not find '$FILENAME' in the release assets after upload."
+            echo "Assets found:"
+            echo "$ASSETS_JSON" | jq .
             exit 1
           fi
 
           echo "NEW_URL=$NEW_URL" >> $GITHUB_OUTPUT
-          echo "Uploaded to: $NEW_URL"
+          echo "Embeddable URL retrieved: $NEW_URL"
 
-      - name: Update README with new video embed
+      - name: Update README.md with the new video URL
         env:
           NEW_URL: ${{ steps.get_url.outputs.NEW_URL }}
         run: |
-          # Replace existing short asset URL line[](https://github.com/.../assets/...mp4)
-          sed -i -E "s|https://github.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/assets/[a-z0-9-]+/[a-z0-9-]+\.mp4|${NEW_URL}|g" README.md
+          # Replace any previous GitHub-hosted video URL (covers both /assets/ and /releases/download/ forms)
+          sed -i -E "s|https://github.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/(assets/[a-f0-9-]+/[a-f0-9-]+|releases/download/[^/]+)[^ ]*\.(mp4|gif)|${NEW_URL}|g" README.md
 
-          # If you use the full <video> tag instead, use this version instead of the line above:
-          # sed -i -E "s|src=\"https://github.com/[^\"]+\"|src=\"${NEW_URL}\"|g" README.md
-
-          # Optional: make sure we have at least one embed line (fallback creation)
-          if ! grep -q "github.com/.*/assets/.*\.mp4" README.md; then
-            echo "" >> README.md
-            echo "<video src=\"${NEW_URL}\" autoplay loop muted playsinline controls style=\"max-width:100%; border-radius:6px;\"></video>" >> README.md
+          # If this is the first time (no video URL found yet), append a nice embed
+          if ! grep -Eq "(github.com/.*/(assets|releases/download)/.*\.(mp4|gif))" README.md; then
+            {
+              echo ""
+              echo "<!-- Pausable demo video - auto-updated by GitHub Actions -->"
+              echo "<video src=\"$NEW_URL\""
+              echo "       autoplay loop muted playsinline controls"
+              echo "       style=\"max-width:100%; height:auto; border:1px solid #e1e4e8; border-radius:6px;\">"
+              echo "  Your browser does not support HTML5 video."
+              echo "</video>"
+            } >> README.md
           fi
 
       - name: Commit and push updated README
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
-          
+
           git add README.md
-          git commit -m "chore: update pausable demo video asset URL [ci skip]" || echo "No change to commit"
-          git push origin HEAD:${{ github.ref_name }}
+          if git diff --staged --quiet; then
+            echo "No changes to README.md - nothing to commit"
+          else
+            git commit -m "chore: update pausable demo video URL [ci skip]"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
