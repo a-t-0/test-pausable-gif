@@ -1,0 +1,27 @@
+name: Update Demo Video
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  generate-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}  # For pushing back
+
+      - name: Set up environment
+        run: |
+          # Install dependencies, e.g., apt-get install ffmpeg, or your tools
+
+      - name: Generate video
+        run: |
+          # Your script to generate demo.mp4 based on updated code
+          # Example: ffmpeg -i input.mp4 -vf "fps=10" demo.mp4
+
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update demo video"
+          file_pattern: demo.mp4
