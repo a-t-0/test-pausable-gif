@@ -12,3 +12,15 @@ Retrieved 2026-01-28, License - CC BY-SA 4.0
 
 ## And the video below:
 <video src="demo.mp4" controls width="600"></video>
+## Try0
+<video src="demo.mp4" controls width="600"></video>
+## Try 1
+<video src="demo.mp4" controls autoplay loop muted width="600"></video>
+
+## Full example
+
+This is a test repo for embedding a pausable video in README.
+
+And the video below:
+
+<video src="demo.mp4" controls width="600"></video>
