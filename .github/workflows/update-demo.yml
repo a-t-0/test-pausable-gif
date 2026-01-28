@@ -1,27 +1,79 @@
-name: Update Demo Video
+name: Update Pausable Demo Video in README
 
 on:
   push:
-    branches: [main]
+    paths:
+      - 'demo.mp4'      # change to 'demo.gif' if you prefer GIF
+      # - 'demo.gif'    # uncomment if you use both / switch later
+
+permissions:
+  contents: write     # allows commit + push back to repo
 
 jobs:
-  generate-and-commit:
+  update-demo:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN }}  # For pushing back
+          fetch-depth: 0    # needed for git commit below
 
-      - name: Set up environment
+      - name: Set up GitHub CLI
         run: |
-          # Install dependencies, e.g., apt-get install ffmpeg, or your tools
+          # gh is already installed on ubuntu-latest, but just in case
+          echo "gh version: $(gh --version)"
 
-      - name: Generate video
+      - name: Upload demo file to persistent draft release & get new URL
+        id: get_url
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: demo-assets   # ← change to whatever tag name you chose above
         run: |
-          # Your script to generate demo.mp4 based on updated code
-          # Example: ffmpeg -i input.mp4 -vf "fps=10" demo.mp4
+          # Find the draft release by tag
+          RELEASE_ID=$(gh release view "$RELEASE_TAG" --json id --jq '.id' 2>/dev/null || echo "")
 
-      - uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "Update demo video"
-          file_pattern: demo.mp4
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Draft release with tag $RELEASE_TAG not found!"
+            echo "Please create a draft release manually first (see instructions)."
+            exit 1
+          fi
+
+          # Upload (overwrite if same name already exists)
+          UPLOAD_OUTPUT=$(gh release upload "$RELEASE_TAG" demo.mp4 --clobber)
+
+          # Extract the asset browser URL (the one that starts with https://github.com/.../assets/...)
+          NEW_URL=$(echo "$UPLOAD_OUTPUT" | grep -o 'https://github.com/[^ ]*\.mp4' || echo "")
+
+          if [ -z "$NEW_URL" ]; then
+            echo "Failed to extract asset URL from upload output:"
+            echo "$UPLOAD_OUTPUT"
+            exit 1
+          fi
+
+          echo "NEW_URL=$NEW_URL" >> $GITHUB_OUTPUT
+          echo "Uploaded to: $NEW_URL"
+
+      - name: Update README with new video embed
+        env:
+          NEW_URL: ${{ steps.get_url.outputs.NEW_URL }}
+        run: |
+          # Replace existing short asset URL line[](https://github.com/.../assets/...mp4)
+          sed -i -E "s|https://github.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+/assets/[a-z0-9-]+/[a-z0-9-]+\.mp4|${NEW_URL}|g" README.md
+
+          # If you use the full <video> tag instead, use this version instead of the line above:
+          # sed -i -E "s|src=\"https://github.com/[^\"]+\"|src=\"${NEW_URL}\"|g" README.md
+
+          # Optional: make sure we have at least one embed line (fallback creation)
+          if ! grep -q "github.com/.*/assets/.*\.mp4" README.md; then
+            echo "" >> README.md
+            echo "<video src=\"${NEW_URL}\" autoplay loop muted playsinline controls style=\"max-width:100%; border-radius:6px;\"></video>" >> README.md
+          fi
+
+      - name: Commit and push updated README
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          
+          git add README.md
+          git commit -m "chore: update pausable demo video asset URL [ci skip]" || echo "No change to commit"
+          git push origin HEAD:${{ github.ref_name }}
